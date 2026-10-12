@@ -1,0 +1,77 @@
+/* Extra styles for the dashboard only (imported by pages/Dashboard.jsx).
+   Everything else uses Tailwind classes. */
+
+/* very light sky-blue brick wall */
+.dash-wall {
+  background-color: #e6f3ff;
+  background-image:
+    radial-gradient(ellipse at 50% 20%, rgba(255, 255, 255, 0.75), transparent 65%),
+    linear-gradient(to bottom, transparent 55%, rgba(120, 175, 230, 0.35)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='72'%3E%3Cg fill='none'%3E%3Cpath d='M0 1H96M0 37H96M1 0V36M49 36V72' stroke='%232f6fb8' stroke-opacity='.13' stroke-width='2'/%3E%3Cpath d='M0 3H96M0 39H96' stroke='%23ffffff' stroke-opacity='.5' stroke-width='1'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: auto, auto, 96px 72px;
+}
+
+/* road along the bottom edge */
+.dash-road {
+  background:
+    linear-gradient(to bottom, #c6d2e0 0 8px, #8d9aab 8px 12px, transparent 12px),
+    radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1.5px) 0 0 / 14px 14px,
+    linear-gradient(to bottom, #66758a, #4d5a6c);
+}
+.dash-road::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 14px;
+  height: 5px;
+  background: repeating-linear-gradient(90deg, #f7e58a 0 50px, transparent 50px 100px);
+  opacity: 0.8;
+}
+
+/* garbage: flies + smell */
+.fly { animation: buzz 2.4s ease-in-out infinite; }
+.fly.f2 { animation-duration: 3.1s; animation-delay: -1s; }
+.fly.f3 { animation-duration: 2.8s; animation-delay: -1.8s; }
+@keyframes buzz {
+  0%   { transform: translate(0, 0); }
+  20%  { transform: translate(14px, -8px); }
+  45%  { transform: translate(-6px, -18px); }
+  70%  { transform: translate(-16px, -4px); }
+  100% { transform: translate(0, 0); }
+}
+.stink { animation: rise 3.2s ease-in-out infinite; opacity: 0; }
+.stink.s2 { animation-delay: -1.6s; }
+@keyframes rise {
+  0%   { transform: translateY(8px); opacity: 0; }
+  30%  { opacity: 0.55; }
+  100% { transform: translateY(-14px); opacity: 0; }
+}
+
+/* pothole water ripples */
+.ripple {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ripple 3.6s ease-out infinite;
+  opacity: 0;
+}
+.ripple.r2 { animation-delay: -1.2s; }
+.ripple.r3 { animation-delay: -2.4s; }
+@keyframes ripple {
+  0%   { transform: scale(0.4); opacity: 0.85; }
+  100% { transform: scale(5); opacity: 0; }
+}
+
+/* microphone while listening */
+.mic-on { animation: micPulse 1.4s ease-in-out infinite; }
+@keyframes micPulse { 50% { box-shadow: 0 0 0 7px rgba(255, 90, 130, 0.15); } }
+.eq-bar { height: 100%; width: 3px; border-radius: 2px; background: currentColor; animation: eq 0.8s ease-in-out infinite; }
+.eq-bar:nth-child(2) { animation-delay: -0.2s; }
+.eq-bar:nth-child(3) { animation-delay: -0.4s; }
+.eq-bar:nth-child(4) { animation-delay: -0.6s; }
+@keyframes eq { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .fly, .stink, .ripple, .mic-on, .eq-bar { animation: none !important; }
+  .ripple { opacity: 0.4; }
+}
