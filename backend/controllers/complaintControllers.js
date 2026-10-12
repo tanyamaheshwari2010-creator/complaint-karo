@@ -5,7 +5,7 @@ const {
 
 const createComplaint = async (req, res) => {
     try {
-        const { description } = req.body;
+        const { description, location } = req.body;
 
         if (!description || !description.trim()) {
             return res.status(400).json({
@@ -16,6 +16,7 @@ const createComplaint = async (req, res) => {
         const complaint = await Complaint.create({
             citizenId: req.user.userId,
             description,
+            location: location?.trim() ?? "",
             aiStatus: "processing"
         });
 
