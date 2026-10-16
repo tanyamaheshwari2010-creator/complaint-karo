@@ -3,6 +3,47 @@ const {
     processComplaintWithAI
 } = require("../services/complaintAIService");
 
+
+
+const classifyComplaintInBackground = async (complaintId, description) => {
+    try {
+        await Complaint.findByIdAndUpdate(complaintId, {
+            aiStatus: "processing"
+        });
+
+        const aiResult = await processComplaintWithAI(description);
+
+        await Complaint.findByIdAndUpdate(complaintId, {
+            aiSuggestedCategory: aiResult.category,
+            aiConfidence: aiResult.confidence,
+            aiSuggestedDepartmentId: aiResult.departmentId,
+            aiStatus: "completed",
+            aiProcessedAt: new Date()
+        });
+
+        console.log(`AI classification completed for ${complaintId}`);
+    } catch (error) {
+        console.error(
+            `AI classification failed for ${complaintId}:`,
+            error.message
+        );
+
+        try {
+            await Complaint.findByIdAndUpdate(complaintId, {
+                aiStatus: "failed",
+                aiProcessedAt: new Date()
+            });
+        } catch (dbError) {
+            console.error(
+                "Could not update AI status:",
+                dbError.message
+            );
+        }
+    }
+};
+
+
+
 const createComplaint = async (req, res) => {
     try {
         const { description, location } = req.body;
@@ -15,39 +56,31 @@ const createComplaint = async (req, res) => {
 
         const complaint = await Complaint.create({
             citizenId: req.user.userId,
-            description,
+            description: description.trim(),
             location: location?.trim() ?? "",
-            aiStatus: "processing"
+            aiStatus: "pending"
         });
 
-        try {
-            const aiResult = await processComplaintWithAI(description);
+        setImmediate(() => {
+            void classifyComplaintInBackground(
+                complaint._id,
+                complaint.description
+            );
+        });
 
-            complaint.aiSuggestedCategory = aiResult.category;
-            complaint.aiConfidence = aiResult.confidence;
-            complaint.aiSuggestedDepartmentId = aiResult.departmentId;
-            complaint.aiStatus = "completed";
-        } catch (error) {
-            console.error("AI processing failed:", error.message);
-
-            complaint.aiStatus = "failed";
-        } finally {
-            complaint.aiProcessedAt = new Date();
-            await complaint.save();
-        }
-
-        res.status(201).json({
+        return res.status(201).json({
             message: "Complaint submitted successfully",
             complaint
         });
     } catch (error) {
         console.error(error);
 
-        res.status(500).json({
+        return res.status(500).json({
             message: "Server error"
         });
     }
 };
+
 
 
 const getMyComplaints = async (req, res) => {
