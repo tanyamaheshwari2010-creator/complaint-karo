@@ -1,6 +1,6 @@
-// Remembers WHO is logged in (name + email) so the dashboard can show it.
+// Remembers WHO is logged in (name, email, role) so the dashboards can show it.
 // It is stored in the same place as the token (see saveToken in client.js).
-export const DEFAULT_USER = { name: "Citizen", email: "" }; // shown until real data arrives
+export const DEFAULT_USER = { name: "Citizen", email: "", role: "" }; // shown until real data arrives
 
 const KEY = "user";
 
@@ -15,6 +15,7 @@ export function saveUser(raw, remember) {
   const user = {
     name: raw?.name ?? raw?.fullName ?? raw?.username ?? (nameFromEmail(email) || DEFAULT_USER.name),
     email,
+    role: raw?.role ?? "",
   };
   clearUser();
   (remember ? localStorage : sessionStorage).setItem(KEY, JSON.stringify(user));

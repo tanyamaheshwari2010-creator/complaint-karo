@@ -4,6 +4,7 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import Login from "./pages/Login.jsx";
 import Signup from "./pages/Signup.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
+import OfficerDashboard from "./pages/OfficerDashboard.jsx";
 
 export default function App() {
   return (
@@ -23,7 +24,18 @@ export default function App() {
         }
       />
 
+      <Route
+        path="/officer"
+        element={
+          <ProtectedRoute roles={["complaint_officer"]}>
+            <OfficerDashboard />
+          </ProtectedRoute>
+        }
+      />
+
       <Route path="*" element={<Navigate to="/login" replace />} />
+
+
     </Routes>
   );
 }

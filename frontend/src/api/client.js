@@ -1,5 +1,5 @@
 // One place for every call to your backend.
-const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
+export const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
 
 /* ---------- token helpers ---------- */
 // "Remember me" ticked  -> localStorage   (survives closing the browser)

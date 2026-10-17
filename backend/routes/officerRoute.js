@@ -4,7 +4,8 @@ const protect = require("../middlewares/authMiddleware");
 const authorize = require("../middlewares/roleMiddleware");
 
 const {
-    getOfficerComplaints, getOfficerComplaintById, reviewComplaint, assignWorker
+    getOfficerComplaints, getOfficerComplaintById, reviewComplaint, assignWorker, getDepartments,
+    getWorkers
 } = require("../controllers/officerController");
 
 const router = express.Router();
@@ -36,6 +37,20 @@ router.patch(
     protect,
     authorize("complaint_officer", "admin"),
     assignWorker
+);
+
+router.get(
+    "/departments",
+    protect,
+    authorize("complaint_officer", "admin"),
+    getDepartments
+);
+
+router.get(
+    "/workers",
+    protect,
+    authorize("complaint_officer", "admin"),
+    getWorkers
 );
 
 module.exports = router;

@@ -8,10 +8,12 @@ const {
 
 const getOfficerComplaints = async (req, res) => {
     try {
-        const complaints = await Complaint.find({
-            status: "submitted"
-        })
+        const { status } = req.query;
+        const filter = typeof status === "string" && status ? { status } : {};
+
+        const complaints = await Complaint.find(filter)
             .sort({ createdAt: -1 })
+            .limit(200)
             .populate("citizenId", "name email")
             .populate("departmentId", "name");
 
@@ -93,7 +95,7 @@ const reviewComplaint = async (req, res) => {
             }
         }
 
-        
+
 
         // Fetch the complaint before modifying it
         const complaint = await Complaint.findById(req.params.id);
@@ -187,6 +189,7 @@ const assignWorker = async (req, res) => {
         }
 
         complaint.assignedWorkerId = worker._id;
+        complaint.assignedOfficerId = req.user.userId;
         complaint.status = "assigned";
 
         await complaint.save();
@@ -204,10 +207,39 @@ const assignWorker = async (req, res) => {
     }
 };
 
+
+const getDepartments = async (req, res) => {
+    try {
+        const departments = await Department.find({ isActive: true })
+            .select("name")
+            .sort({ name: 1 });
+
+        res.json({ departments });
+    } catch (error) {
+        console.error("Get departments error:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+
+const getWorkers = async (req, res) => {
+    try {
+        const workers = await User.find({ role: "field_worker" })
+            .select("name email")
+            .sort({ name: 1 });
+
+        res.json({ workers });
+    } catch (error) {
+        console.error("Get workers error:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+
 module.exports = {
     getOfficerComplaints,
     getOfficerComplaintById,
     reviewComplaint,
-    assignWorker
+    assignWorker,
+    getDepartments,
+    getWorkers
 };
 

@@ -43,7 +43,7 @@ export default function Login() {
     },
     form.remember
   );
-      navigate("/Dashboard");
+      navigate(data.user?.role === "complaint_officer" ? "/officer" : "/Dashboard");
     } catch (err) {
       setError(err.message);
     } finally {
