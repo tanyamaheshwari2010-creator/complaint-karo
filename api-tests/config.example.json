@@ -1,0 +1,10 @@
+{
+  "baseUrl": "http://localhost:5000",
+  "accounts": {
+    "citizen":  { "email": "citizen@example.com",  "password": "..." },
+    "citizen2": { "email": "citizen2@example.com", "password": "..." },
+    "officer":  { "email": "officer@example.com",  "password": "..." },
+    "worker":   { "email": "worker@example.com",   "password": "..." },
+    "worker2":  { "email": "worker2@example.com",  "password": "..." }
+  }
+}
