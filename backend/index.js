@@ -8,6 +8,7 @@ const connectDB = require("./config/db");
 const authRoutes = require("./routes/authRoute");
 const complaintRoutes = require("./routes/complaintRoute");
 const officerRoutes = require("./routes/officerRoute");
+const workerRoutes = require("./routes/workerRoute");
 
 dotenv.config();
 
@@ -18,6 +19,8 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/complaints", complaintRoutes);
 app.use("/api/officer", officerRoutes);
+app.use("/api/worker", workerRoutes);
+
 
 app.get("/", (req, res) => {
     res.json({

@@ -8,15 +8,16 @@ import RoadScene from "../components/dashboard/RoadScene.jsx";
 import ComplaintQueue from "../components/officer/ComplaintQueue.jsx";
 import OfficerStatCards from "../components/officer/OfficerStatCards.jsx";
 import ReviewPanel from "../components/officer/ReviewPanel.jsx";
-import { isUnsure, normalize } from "../components/officer/officerConfig.js";
+import { FIELD_STATUSES, aiProblem, isUnsure, normalize } from "../components/officer/officerConfig.js";
 import "../styles/dashboard.css";
 
 const TITLES = {
   all: "Complaint queue",
   submitted: "Awaiting review",
   under_review: "Reviewed complaints",
-  assigned: "Assigned complaints",
-  unsure: "AI was unsure about these",
+  field: "In the field",
+  resolved: "Resolved complaints",
+  unsure: "AI unsure: check these first",
 };
 
 export default function OfficerDashboard() {
@@ -81,6 +82,30 @@ export default function OfficerDashboard() {
     load();
   }, [load]);
 
+
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const data = await officerApi.complaints();
+      setComplaints((data.complaints ?? []).map((x) => normalize(x)));
+    } catch (e) {
+      if (e.status === 401) handleLogout();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [handleLogout]);
+
+  useEffect(() => {
+    const tick = () => { if (!document.hidden) refresh(); };
+    const timer = setInterval(tick, 15000);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [refresh]);
+
   /* ---------- actions (errors are shown inside the panel) ---------- */
   const replaceComplaint = (updated) =>
     setComplaints((list) => list.map((x) => (x._id === updated._id ? normalize(updated, x) : x)));
@@ -102,8 +127,11 @@ export default function OfficerDashboard() {
     () => ({
       submitted: complaints.filter((c) => c.status === "submitted").length,
       under_review: complaints.filter((c) => c.status === "under_review").length,
-      assigned: complaints.filter((c) => c.status === "assigned").length,
+      field: complaints.filter((c) => FIELD_STATUSES.includes(c.status)).length,
+      resolved: complaints.filter((c) => c.status === "resolved").length,
       unsure: complaints.filter(isUnsure).length,
+      unsureLow: complaints.filter((c) => aiProblem(c) === "low").length,
+      unsureFailed: complaints.filter((c) => aiProblem(c) === "failed").length,
     }),
     [complaints]
   );
@@ -111,8 +139,15 @@ export default function OfficerDashboard() {
   const visible = useMemo(
     () =>
       complaints
-        .filter((c) => filter === "all" || (filter === "unsure" ? isUnsure(c) : c.status === filter))
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+        .filter((c) =>
+          filter === "all" ||
+          (filter === "unsure" ? isUnsure(c) : filter === "field" ? FIELD_STATUSES.includes(c.status) : c.status === filter)
+        )
+        .sort(
+          (a, b) =>
+            (filter === "unsure" ? (aiProblem(a) === "failed" ? 0 : 1) - (aiProblem(b) === "failed" ? 0 : 1) : 0) ||
+            new Date(b.createdAt) - new Date(a.createdAt)
+        ),
     [complaints, filter]
   );
 
@@ -157,8 +192,8 @@ export default function OfficerDashboard() {
             {loading
               ? "Loading your queue…"
               : counts.submitted
-              ? `${counts.submitted} new complaint${counts.submitted > 1 ? "s are" : " is"} waiting for your review.`
-              : "No new complaints waiting. Nice work!"}
+                ? `${counts.submitted} new complaint${counts.submitted > 1 ? "s are" : " is"} waiting for your review.`
+                : "No new complaints waiting. Nice work!"}
           </p>
 
           <OfficerStatCards counts={counts} active={filter} onSelect={handleFilter} />

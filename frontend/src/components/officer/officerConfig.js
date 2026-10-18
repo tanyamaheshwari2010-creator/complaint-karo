@@ -4,9 +4,10 @@
 // (the backend rejects anything that isn't in its list).
 export const CATEGORIES = {
   garbage: "Garbage",
-  water: "Water",
-  electricity: "Electricity",
   streetlight: "Streetlight",
+  water_leak: "Water leakage",
+  pothole: "Road / pothole",
+  drainage: "Drainage",
   other: "Other",
 };
 
@@ -19,8 +20,13 @@ export const STATUS = {
   submitted:    { label: "Awaiting review", badge: "bg-[#fff3d1] text-[#8a5a00]" },
   under_review: { label: "Reviewed",        badge: "bg-[#dcebff] text-[#1d4ea0]" },
   assigned:     { label: "Assigned",        badge: "bg-[#e3e4ff] text-[#3a3fb0]" },
+  in_progress:  { label: "In progress",     badge: "bg-[#d6f0ff] text-[#0b5e8f]" },
+  resolved:     { label: "Resolved",        badge: "bg-[#d9f6e4] text-[#17693a]" },
 };
 export const statusInfo = (s) => STATUS[s] ?? { label: prettify(s), badge: "bg-[#e8eef7] text-[#3d5478]" };
+
+// Complaints that are out with the field team (assigned, or being worked on).
+export const FIELD_STATUSES = ["assigned", "in_progress"];
 
 // The backend only lets officers review/assign complaints in these states.
 export const REVIEWABLE = ["submitted", "under_review"];
@@ -40,9 +46,21 @@ export function normalize(c, prev) {
   };
 }
 
-// AI failed, still working, or not confident: the officer should look closely.
-export const isUnsure = (c) =>
-  REVIEWABLE.includes(c.status) && (c.aiStatus !== "completed" || (c.aiConfidence ?? 0) < 0.6);
+// What is wrong with the AI result, if anything?
+//   "failed" = it failed, or it has been "pending/processing" for 5+ minutes (the job was probably lost)
+//   "low"    = it answered, but with low confidence
+//   null     = fine (or still working, or the complaint is past the review stage)
+export const AI_STUCK_MS = 5 * 60 * 1000;
+export function aiProblem(c) {
+  if (!REVIEWABLE.includes(c.status)) return null;
+  if (c.aiStatus === "failed") return "failed";
+  if (c.aiStatus === "pending" || c.aiStatus === "processing") {
+    return Date.now() - new Date(c.createdAt) > AI_STUCK_MS ? "failed" : null;
+  }
+  if (c.aiStatus === "completed" && (c.aiConfidence ?? 0) < 0.6) return "low";
+  return null;
+}
+export const isUnsure = (c) => aiProblem(c) !== null;
 
 export const shortId = (id) => "#" + String(id).slice(-6).toUpperCase();
 export const pct = (x) => Math.round((x ?? 0) * 100);

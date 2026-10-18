@@ -5,6 +5,7 @@ import Login from "./pages/Login.jsx";
 import Signup from "./pages/Signup.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import OfficerDashboard from "./pages/OfficerDashboard.jsx";
+import WorkerDashboard from "./pages/WorkerDashboard.jsx";
 
 export default function App() {
   return (
@@ -29,6 +30,15 @@ export default function App() {
         element={
           <ProtectedRoute roles={["complaint_officer"]}>
             <OfficerDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/worker"
+        element={
+          <ProtectedRoute roles={["field_worker"]}>
+            <WorkerDashboard />
           </ProtectedRoute>
         }
       />

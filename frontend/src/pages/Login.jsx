@@ -32,18 +32,19 @@ export default function Login() {
     setLoading(true);
     try {
       const data = await api.login({ email: form.email.trim(), password: form.password });
-        // Save the authentication token returned by the backend.
-  saveToken(data.token, form.remember);
+      // Save the authentication token returned by the backend.
+      saveToken(data.token, form.remember);
 
-  // Save user details for display in the frontend.
-  saveUser(
-    data.user ?? {
-      name: form.email.trim(),
-      email: form.email.trim(),
-    },
-    form.remember
-  );
-      navigate(data.user?.role === "complaint_officer" ? "/officer" : "/Dashboard");
+      // Save user details for display in the frontend.
+      saveUser(
+        data.user ?? {
+          name: form.email.trim(),
+          email: form.email.trim(),
+        },
+        form.remember
+      );
+      const HOME = { complaint_officer: "/officer", field_worker: "/worker" };
+      navigate(HOME[data.user?.role] ?? "/dashboard");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -56,7 +57,7 @@ export default function Login() {
       <form onSubmit={handleSubmit} noValidate>
         <AuthInput
           icon={<UserIcon />}
-          type="email"          
+          type="email"
           name="email"
           placeholder="Email"
           autoComplete="email"

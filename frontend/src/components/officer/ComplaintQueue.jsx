@@ -1,4 +1,4 @@
-import { categoryLabel, confChip, pct, relTime, shortId, statusInfo } from "./officerConfig.js";
+import { aiProblem, categoryLabel, confChip, pct, relTime, shortId, statusInfo } from "./officerConfig.js";
 
 const chip = "inline-flex items-center rounded-full px-2.5 py-0.5 text-[0.7rem] font-semibold";
 
@@ -57,7 +57,7 @@ export default function ComplaintQueue({ complaints, selectedId, onSelect, depar
                 <span className={`${chip} ${confChip(c.aiConfidence)}`}>
                   AI: {categoryLabel(c.aiSuggestedCategory)} · {pct(c.aiConfidence)}%
                 </span>
-              ) : c.aiStatus === "processing" ? (
+              ) : ["pending", "processing"].includes(c.aiStatus) && aiProblem(c) !== "failed" ? (
                 <span className={`${chip} bg-[#eef2ff] text-[#3a3fb0]`}>AI is working…</span>
               ) : (
                 <span className={`${chip} bg-[#ffe9ee] text-[#c4284d]`}>AI failed · choose manually</span>

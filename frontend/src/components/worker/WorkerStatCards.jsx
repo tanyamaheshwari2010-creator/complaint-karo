@@ -1,0 +1,62 @@
+import useCountUp from "../../hooks/useCountUp.js";
+
+const CARDS = [
+  { key: "all", label: "Total assigned", hint: "Everything given to you", color: "#2f6fe0", radius: "34px 34px 34px 10px", offset: false,
+    icon: "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm2 5v2h10V8H7Zm0 4v2h10v-2H7Zm0 4v2h6v-2H7Z" },
+  { key: "assigned", label: "New", hint: "Not started yet", color: "#6b6ff0", radius: "34px 10px 34px 34px", offset: true,
+    icon: "M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2Zm6-6V11a6 6 0 0 0-5-5.9V4a1 1 0 0 0-2 0v1.1A6 6 0 0 0 6 11v5l-2 2v1h16v-1l-2-2Z" },
+  { key: "in_progress", label: "In progress", hint: "You're working on it", color: "#3b9be8", radius: "10px 34px 34px 34px", offset: false,
+    icon: "M22 7.2 17.8 3l-1.4 1.4 1.6 1.6a6 6 0 0 0-7.7 7.7L3 20.6 4.4 22l7.3-7.3A6 6 0 0 0 19.4 7l1.6 1.6L22 7.2Z" },
+  { key: "resolved", label: "Resolved", hint: "Done and closed", color: "#1fa463", radius: "34px 34px 10px 34px", offset: true,
+    icon: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-1.2 14.6-4-4 1.4-1.4 2.6 2.6 5-5 1.4 1.4-6.4 6.4Z" },
+];
+
+function StatCard({ card, value, active, onSelect }) {
+  const shown = useCountUp(value);
+
+  return (
+    // the wrapper holds the downward offset
+    <div className={card.offset ? "translate-y-[34px]" : ""}>
+      {/*
+        CURSOR FIX: the button never moves, so the area under the pointer stays put.
+        Only the inner "face" lifts on hover, so the pointer can't flicker at the edges.
+      */}
+      <button
+        type="button"
+        aria-pressed={active}
+        onClick={() => onSelect(card.key)}
+        style={{ borderRadius: card.radius }}
+        className="group block w-full cursor-pointer text-left text-[#14305e] focus-visible:outline-3 focus-visible:outline-offset-[3px] focus-visible:outline-[#2f6fe0]/45"
+      >
+        <span
+          style={{ borderRadius: card.radius, borderColor: active ? card.color : "transparent" }}
+          className="flex flex-col gap-1 border-2 bg-white/90 px-5 pb-3.5 pt-4 shadow-[0_12px_28px_rgba(47,111,184,0.16)] transition duration-200 group-hover:-translate-y-1 group-hover:shadow-[0_16px_34px_rgba(47,111,184,0.24)] max-[480px]:px-3.5 max-[480px]:pb-3 max-[480px]:pt-3.5"
+        >
+          <span
+            style={{ background: `color-mix(in srgb, ${card.color} 16%, white)` }}
+            className="mb-0.5 grid h-9 w-9 place-items-center rounded-[14px_14px_14px_5px]"
+          >
+            <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" style={{ fill: card.color }} aria-hidden="true">
+              <path d={card.icon} />
+            </svg>
+          </span>
+          <span style={{ color: card.color }} className="text-[2.1rem] font-bold leading-none max-[480px]:text-[1.75rem]">
+            {shown}
+          </span>
+          <span className="text-[0.86rem] font-semibold">{card.label}</span>
+          <span className="text-[0.72rem] text-[#5b7396] max-[480px]:hidden">{card.hint}</span>
+        </span>
+      </button>
+    </div>
+  );
+}
+
+export default function WorkerStatCards({ counts, active, onSelect }) {
+  return (
+    <div className="mt-5 grid grid-cols-2 gap-x-[22px] gap-y-4 pb-[34px] max-[480px]:gap-x-3.5 max-[480px]:gap-y-3">
+      {CARDS.map((card) => (
+        <StatCard key={card.key} card={card} value={counts[card.key]} active={active === card.key} onSelect={onSelect} />
+      ))}
+    </div>
+  );
+}

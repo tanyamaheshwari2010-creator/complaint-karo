@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  CATEGORIES, REVIEWABLE, categoryLabel, confColor, confChip, idOf, pct, relTime, shortId,
+  CATEGORIES, REVIEWABLE, aiProblem, categoryLabel, confColor, confChip, idOf, pct, relTime, shortId,
 } from "./officerConfig.js";
 
 const chip = "inline-flex items-center rounded-full px-2.5 py-0.5 text-[0.7rem] font-semibold";
@@ -11,23 +11,24 @@ const btnBase =
 const btnPrimary = `${btnBase} bg-linear-to-br from-[#4b8bf0] to-[#2457c5] shadow-[0_10px_24px_rgba(47,111,224,0.38)] hover:shadow-[0_14px_30px_rgba(47,111,224,0.5)]`;
 const btnAssign = `${btnBase} bg-linear-to-br from-[#7c80f5] to-[#4a4fd0] shadow-[0_10px_24px_rgba(74,79,208,0.35)] hover:shadow-[0_14px_30px_rgba(74,79,208,0.5)]`;
 
+const JOURNEY = ["submitted", "under_review", "assigned", "in_progress", "resolved"];
+const JOURNEY_LABELS = ["Submitted", "Reviewed", "Assigned", "Working", "Done"];
+
 function Steps({ status }) {
-  const idx = status === "submitted" ? 0 : status === "under_review" ? 1 : 2;
-  const step = (n, label) => (
-    <span className={`flex items-center gap-1.5 ${idx >= n ? "text-[#1f55b8]" : ""}`}>
-      <span className={`grid h-[18px] w-[18px] place-items-center rounded-full text-[0.62rem] text-white ${idx >= n ? "bg-[#2f6fe0]" : "bg-[#e2ecf8]"}`}>
-        {idx >= n ? "✓" : n + 1}
-      </span>
-      {label}
-    </span>
-  );
+  const idx = Math.max(0, JOURNEY.indexOf(status));
   return (
-    <div className="mb-3.5 flex items-center gap-1.5 text-[0.7rem] font-semibold text-[#9fb2cc]">
-      {step(0, "Submitted")}
-      <span className="h-0.5 flex-1 rounded bg-[#e2ecf8]" />
-      {step(1, "Reviewed")}
-      <span className="h-0.5 flex-1 rounded bg-[#e2ecf8]" />
-      {step(2, "Assigned")}
+    <div className="mb-3.5 flex items-center gap-1 text-[0.66rem] font-semibold text-[#9fb2cc]">
+      {JOURNEY_LABELS.map((label, n) => (
+        <span key={label} className="contents">
+          {n > 0 && <span className={`h-0.5 min-w-1.5 flex-1 rounded ${idx >= n ? "bg-[#2f6fe0]" : "bg-[#e2ecf8]"}`} />}
+          <span className={`flex items-center gap-1 ${idx >= n ? "text-[#1f55b8]" : ""}`}>
+            <span className={`grid h-4 w-4 shrink-0 place-items-center rounded-full text-[0.58rem] text-white ${idx >= n ? "bg-[#2f6fe0]" : "bg-[#e2ecf8]"}`}>
+              {idx >= n ? "✓" : n + 1}
+            </span>
+            <span className="max-[400px]:hidden">{label}</span>
+          </span>
+        </span>
+      ))}
     </div>
   );
 }
@@ -180,7 +181,7 @@ export default function ReviewPanel({ complaint, departments, workers, onReview,
           </div>
         ) : (
           <p className="mt-2 text-[0.74rem] text-[#c4284d]">
-            {c.aiStatus === "processing" ? "The AI is still working on this one." : "The AI couldn't classify this complaint."} Please choose the category and department yourself.
+            {["pending", "processing"].includes(c.aiStatus) && aiProblem(c) !== "failed" ? "The AI is still working on this one." : "The AI couldn't classify this complaint."} Please choose the category and department yourself.
           </p>
         )}
       </div>
@@ -224,9 +225,18 @@ export default function ReviewPanel({ complaint, departments, workers, onReview,
       </div>
 
       {locked ? (
-        <div className="rounded-[18px] bg-[#e8ebff] p-3.5 text-[0.84rem] font-semibold text-[#3a3fb0]">
-          {c.assignedWorkerId ? `Assigned to ${assignedWorker?.name ?? "a field worker"}` : "This complaint can no longer be changed here."}
+        <div className={`rounded-[18px] p-3.5 text-[0.84rem] font-semibold ${c.status === "resolved" ? "bg-[#d9f6e4] text-[#17693a]" : "bg-[#e8ebff] text-[#3a3fb0]"}`}>
+          {c.status === "resolved"
+            ? `✓ Resolved${assignedWorker ? ` by ${assignedWorker.name}` : ""}`
+            : c.status === "in_progress"
+            ? `${assignedWorker?.name ?? "A field worker"} is working on this`
+            : c.assignedWorkerId
+            ? `Assigned to ${assignedWorker?.name ?? "a field worker"}`
+            : "This complaint can no longer be changed here."}
           {deptName(c.departmentId) ? ` · ${deptName(c.departmentId)}` : ""}
+          {c.status === "resolved" && (c.resolvedAt ?? c.updatedAt) && (
+            <div className="mt-1 text-[0.74rem] font-medium">Completed {relTime(c.resolvedAt ?? c.updatedAt)}</div>
+          )}
         </div>
       ) : (
         <>
