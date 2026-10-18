@@ -146,64 +146,46 @@ const User = require("../models/user");
 
 const assignWorker = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) {
-        return res.status(400).json({
-            message: "Invalid complaint ID"
-        });
+        return res.status(400).json({ message: "Invalid complaint ID" });
     }
 
     const { workerId } = req.body;
 
     if (!mongoose.isValidObjectId(workerId)) {
-        return res.status(400).json({
-            message: "Valid worker ID is required"
-        });
+        return res.status(400).json({ message: "Valid worker ID is required" });
     }
 
     try {
-        const complaint = await Complaint.findById(req.params.id);
-
-        if (!complaint) {
-            return res.status(404).json({
-                message: "Complaint not found"
-            });
-        }
-
-        if (
-            complaint.status !== "under_review" ||
-            !complaint.departmentId
-        ) {
-            return res.status(409).json({
-                message: "Complaint must be reviewed and have a department before assignment"
-            });
-        }
-
-        const worker = await User.findOne({
-            _id: workerId,
-            role: "field_worker"
-        });
+        const worker = await User.findOne({ _id: workerId, role: "field_worker" });
 
         if (!worker) {
-            return res.status(404).json({
-                message: "Field worker not found"
-            });
+            return res.status(404).json({ message: "Field worker not found" });
         }
 
-        complaint.assignedWorkerId = worker._id;
-        complaint.assignedOfficerId = req.user.userId;
-        complaint.status = "assigned";
+        // One atomic step: only works if the complaint is STILL reviewed and has a department.
+        const complaint = await Complaint.findOneAndUpdate(
+            { _id: req.params.id, status: "under_review", departmentId: { $ne: null } },
+            {
+                $set: {
+                    assignedWorkerId: worker._id,
+                    assignedOfficerId: req.user.userId,
+                    status: "assigned"
+                }
+            },
+            { returnDocument: "after" }
+        );
 
-        await complaint.save();
+        if (!complaint) {
+            const exists = await Complaint.exists({ _id: req.params.id });
+            return exists
+                ? res.status(409).json({ message: "Complaint must be reviewed and have a department before assignment" })
+                : res.status(404).json({ message: "Complaint not found" });
+        }
 
-        res.json({
-            message: "Worker assigned successfully",
-            complaint
-        });
+        res.json({ message: "Worker assigned successfully", complaint });
     } catch (error) {
         console.error("Assign worker error:", error);
-
-        res.status(500).json({
-            message: "Server error"
-        });
+        res.status(500).json({ message: "Server error" });
     }
 };
 

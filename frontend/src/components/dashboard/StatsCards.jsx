@@ -50,31 +50,38 @@ function StatCard({ card, value, active, onSelect }) {
   const shown = useCountUp(value);
 
   return (
-    // the wrapper holds the downward offset, so the hover lift on the button doesn't cancel it
+    // the wrapper holds the downward offset
     <div className={card.offset ? "translate-y-[34px]" : ""}>
+      {/*
+        CURSOR FIX: the button itself never moves, so the area under the pointer stays put.
+        Only the inner "face" lifts on hover. (Before, the whole button lifted 4px, which pushed the
+        pointer off the bottom edge, which dropped the card, which lifted it again... and it flickered.)
+      */}
       <button
         type="button"
         aria-pressed={active}
         onClick={() => onSelect(card.key)}
-        style={{
-          borderRadius: card.radius,
-          borderColor: active ? card.color : "transparent",
-        }}
-        className="flex w-full cursor-pointer flex-col gap-1 border-2 bg-white/90 px-5 pb-4 pt-[18px] text-left text-[#14305e] shadow-[0_12px_28px_rgba(47,111,184,0.16)] transition duration-200 hover:-translate-y-1 hover:shadow-[0_16px_34px_rgba(47,111,184,0.24)] focus-visible:outline-3 focus-visible:outline-offset-[3px] focus-visible:outline-[#2f6fe0]/45 max-[480px]:px-3.5 max-[480px]:pb-3 max-[480px]:pt-3.5"
+        style={{ borderRadius: card.radius }}
+        className="group block w-full cursor-pointer text-left text-[#14305e] focus-visible:outline-3 focus-visible:outline-offset-[3px] focus-visible:outline-[#2f6fe0]/45"
       >
         <span
-          style={{ background: `color-mix(in srgb, ${card.color} 16%, white)` }}
-          className="mb-1 grid h-[38px] w-[38px] place-items-center rounded-[14px_14px_14px_5px]"
+          style={{ borderRadius: card.radius, borderColor: active ? card.color : "transparent" }}
+          className="flex flex-col gap-1 border-2 bg-white/90 px-5 pb-4 pt-[18px] shadow-[0_12px_28px_rgba(47,111,184,0.16)] transition duration-200 group-hover:-translate-y-1 group-hover:shadow-[0_16px_34px_rgba(47,111,184,0.24)] max-[480px]:px-3.5 max-[480px]:pb-3 max-[480px]:pt-3.5"
         >
-          <svg viewBox="0 0 24 24" className="h-[19px] w-[19px]" style={{ fill: card.color }} aria-hidden="true">
-            <path d={card.icon} />
-          </svg>
+          <span
+            style={{ background: `color-mix(in srgb, ${card.color} 16%, white)` }}
+            className="mb-1 grid h-[38px] w-[38px] place-items-center rounded-[14px_14px_14px_5px]"
+          >
+            <svg viewBox="0 0 24 24" className="h-[19px] w-[19px]" style={{ fill: card.color }} aria-hidden="true">
+              <path d={card.icon} />
+            </svg>
+          </span>
+          <span style={{ color: card.color }} className="text-[2.2rem] font-bold leading-none max-[480px]:text-[1.8rem]">
+            {shown}
+          </span>
+          <span className="text-[0.86rem] font-semibold">{card.label}</span>
+          <span className="text-[0.72rem] text-[#5b7396] max-[480px]:hidden">{card.hint}</span>
         </span>
-        <span style={{ color: card.color }} className="text-[2.2rem] font-bold leading-none max-[480px]:text-[1.8rem]">
-          {shown}
-        </span>
-        <span className="text-[0.86rem] font-semibold">{card.label}</span>
-        <span className="text-[0.72rem] text-[#5b7396] max-[480px]:hidden">{card.hint}</span>
       </button>
     </div>
   );

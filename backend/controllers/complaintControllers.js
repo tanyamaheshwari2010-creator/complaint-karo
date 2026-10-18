@@ -48,7 +48,7 @@ const createComplaint = async (req, res) => {
     try {
         const { description, location } = req.body;
 
-        if (!description || !description.trim()) {
+        if (typeof description !== "string" || !description.trim()) {
             return res.status(400).json({
                 message: "Complaint description is required"
             });

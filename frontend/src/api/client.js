@@ -32,7 +32,9 @@ async function request(path, options = {}) {
   const data = await res.json().catch(() => null);
 
   if (!res.ok) {
-    throw new Error(data?.message || "Something went wrong. Please try again.");
+    const err = new Error(data?.message || "Something went wrong. Please try again.");
+    err.status = res.status; // lets the pages react to 401 (logged out) and 403 (not allowed)
+    throw err;
   }
   return data;
 }
@@ -46,10 +48,7 @@ export const api = {
     request("/api/auth/signup", { method: "POST", body: JSON.stringify(body) }),
 
   createComplaint: (body) =>
-  request("/api/complaints", {
-    method: "POST",
-    body: JSON.stringify(body),
-  }),
+    request("/api/complaints", { method: "POST", body: JSON.stringify(body) }),
 
-myComplaints: () => request("/api/complaints"),
+  myComplaints: () => request("/api/complaints"),
 };

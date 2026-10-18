@@ -1,131 +1,124 @@
-import { useMemo, useRef, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { api, clearToken } from "../api/client.js";
 import { clearUser, getUser } from "../api/session.js";
-// import { mockComplaints } from "../data/mockComplaints.js";
 import ComplaintComposer from "../components/dashboard/ComplaintComposer.jsx";
 import ComplaintList from "../components/dashboard/ComplaintList.jsx";
 import ProfileMenu from "../components/dashboard/ProfileMenu.jsx";
 import RoadScene from "../components/dashboard/RoadScene.jsx";
 import StatsCards from "../components/dashboard/StatsCards.jsx";
+import { groupOf } from "../components/dashboard/statusConfig.js";
+import { shortId } from "../components/officer/officerConfig.js";
 import "../styles/dashboard.css";
-function formatComplaint(complaint) {
-  const statusMap = {
-    submitted: "pending",
-    under_review: "pending",
-    assigned: "progress",
-    in_progress: "progress",
-    resolved: "resolved",
-  };
 
-  const description = complaint.description ?? "";
-
-  return {
-    id: `CMP-${complaint._id.slice(-6).toUpperCase()}`,
-    title:
-      description.length > 60
-        ? `${description.slice(0, 57)}…`
-        : description,
-    place: complaint.location || "Location not provided",
-    status: statusMap[complaint.status] ?? "pending",
-    update: complaint.createdAt
-      ? `Submitted · ${new Date(complaint.createdAt).toLocaleString()}`
-      : "Submitted",
-  };
-}
-
-
+const pill =
+  "rounded-full border border-[#cfe0f5] bg-white/90 px-4 py-2 text-[0.8rem] font-semibold text-[#1f55b8] shadow-[0_4px_14px_rgba(47,111,184,0.12)] hover:bg-white max-[600px]:hidden";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-
-  // Name/email come from what was saved at login (see api/session.js).
-  // Until your backend sends them, this shows a plain "Citizen".
   const user = useMemo(() => getUser(), []);
 
-  // TODO: load this from your backend instead of demo data, e.g. api.myComplaints()
+  // Real complaints from the backend. The database is the only source of truth.
   const [complaints, setComplaints] = useState([]);
-  const [complaintsLoading, setComplaintsLoading] = useState(true);
-  const [complaintsError, setComplaintsError] = useState("");
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadComplaints() {
-      try {
-        setComplaintsError("");
-
-        const data = await api.myComplaints();
-
-        if (active) {
-          setComplaints(
-            (data.complaints ?? []).map(formatComplaint)
-          );
-        }
-      } catch (error) {
-        if (active) {
-          setComplaintsError(error.message);
-        }
-      } finally {
-        if (active) {
-          setComplaintsLoading(false);
-        }
-      }
-    }
-
-    loadComplaints();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [filter, setFilter] = useState("all");
   const [toast, setToast] = useState("");
   const toastTimer = useRef();
 
+  const showToast = (msg) => {
+    setToast(msg);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(""), 4200);
+  };
+
+  const handleLogout = useCallback(() => {
+    clearToken();
+    clearUser();
+    navigate("/login");
+  }, [navigate]);
+
+  // silent = refresh in the background (no loading screen; keeps the old list if it fails)
+  const load = useCallback(
+    async (silent = false) => {
+      if (!silent) {
+        setLoading(true);
+        setError("");
+      }
+      try {
+        const data = await api.myComplaints();
+        setComplaints(data.complaints ?? []);
+      } catch (e) {
+        if (e.status === 401) return handleLogout(); // token missing or expired
+        if (!silent) setError(e.message || "Couldn't load your complaints.");
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [handleLogout]
+  );
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Quietly re-read the list, so a complaint moving along (reviewed, assigned, started, resolved)
+  // shows up without refreshing the page.
+  useEffect(() => {
+    const tick = () => {
+      if (!document.hidden) load(true);
+    };
+    const timer = setInterval(tick, 15000);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [load]);
+
+  const handleSubmit = async ({ description, location, photo }) => {
+    // Photos aren't supported by the backend yet, so only text goes out.
+    const data = await api.createComplaint({ description, location });
+    setFilter("all");
+    await load(true);
+    const id = data?.complaint?._id ? shortId(data.complaint._id) : "";
+    showToast(
+      photo
+        ? "Complaint submitted. Photos can't be uploaded yet, so it was sent without the photo."
+        : `Complaint ${id} submitted ✓`
+    );
+  };
+
+  // The five real statuses are grouped into the three the citizen sees.
   const counts = useMemo(
     () => ({
       all: complaints.length,
-      pending: complaints.filter((c) => c.status === "pending").length,
-      progress: complaints.filter((c) => c.status === "progress").length,
-      resolved: complaints.filter((c) => c.status === "resolved").length,
+      pending: complaints.filter((c) => groupOf(c.status) === "pending").length,
+      progress: complaints.filter((c) => groupOf(c.status) === "progress").length,
+      resolved: complaints.filter((c) => groupOf(c.status) === "resolved").length,
     }),
     [complaints]
+  );
+
+  const visible = useMemo(
+    () =>
+      complaints
+        .filter((c) => filter === "all" || groupOf(c.status) === filter)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+    [complaints, filter]
   );
 
   const hour = new Date().getHours();
   const part = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const firstName = user.name.split(" ")[0];
 
-  const showToast = (msg) => {
-    setToast(msg);
-    clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(""), 3200);
-  };
-
-  const handleLogout = () => {
-    clearToken();
-    clearUser();
-    navigate("/login");
-  };
-
-  const handleSubmit = async ({ description, location }) => {
-    const data = await api.createComplaint({
-      description: description.trim(),
-      location: location.trim(),
-    });
-
-    const savedComplaint = formatComplaint(data.complaint);
-
-    setComplaints((previous) => [
-      savedComplaint,
-      ...previous,
-    ]);
-
-    setFilter("all");
-    showToast("Complaint submitted successfully!");
-  };
+  const subtitle = loading
+    ? "Loading your complaints…"
+    : counts.progress
+    ? `${counts.progress} of your complaints ${counts.progress === 1 ? "is" : "are"} being worked on right now.`
+    : counts.all
+    ? "We're on it. You'll see updates here as they happen."
+    : "File your first complaint on the right.";
 
   return (
     <div className="relative min-h-screen overflow-hidden px-[clamp(16px,4vw,56px)] pb-[190px] font-sans text-[#14305e]">
@@ -142,36 +135,31 @@ export default function Dashboard() {
           </span>
           Civic Complaint Desk
         </div>
-        <ProfileMenu user={user} onLogout={handleLogout} />
+
+        <div className="flex items-center gap-3">
+          {/* staff can jump back to their own desk */}
+          {user.role === "complaint_officer" && <Link to="/officer" className={pill}>← Officer desk</Link>}
+          {user.role === "field_worker" && <Link to="/worker" className={pill}>← My assignments</Link>}
+          <ProfileMenu user={user} onLogout={handleLogout} />
+        </div>
       </header>
 
-      {/* content */}
       <main className="relative z-[5] mx-auto grid max-w-[1180px] items-start gap-[26px] pt-2 min-[921px]:grid-cols-[minmax(0,1fr)_420px] min-[921px]:gap-[38px]">
-        <section>
+        <section className="min-w-0">
           <h1 className="text-[clamp(1.4rem,2.4vw,1.9rem)] font-bold tracking-tight">
             {part}, {firstName} 👋
           </h1>
-          <p className="mt-0.5 text-[0.9rem] text-[#5b7396]">
-            {counts.progress
-              ? `${counts.progress} of your complaints ${counts.progress === 1 ? "is" : "are"} being worked on right now.`
-              : "Nothing is being worked on right now."}
-          </p>
+          <p className="mt-0.5 text-[0.9rem] text-[#5b7396]">{subtitle}</p>
 
-
-          {complaintsLoading && (
-            <p className="mt-4 text-sm text-[#5b7396]">
-              Loading your complaints…
-            </p>
-          )}
-
-          {complaintsError && (
-            <p role="alert" className="mt-4 text-sm text-red-600">
-              Could not load complaints: {complaintsError}
-            </p>
-          )}
-
-          <StatsCards counts={counts} active={filter} onSelect={setFilter} />
-          <ComplaintList complaints={complaints} filter={filter} />
+          <StatsCards counts={counts} active={filter} onSelect={(key) => setFilter((f) => (f === key && key !== "all" ? "all" : key))} />
+          <ComplaintList
+            complaints={visible}
+            filter={filter}
+            hasAny={complaints.length > 0}
+            loading={loading}
+            error={error}
+            onRetry={() => load()}
+          />
         </section>
 
         <ComplaintComposer onSubmit={handleSubmit} />
@@ -180,7 +168,7 @@ export default function Dashboard() {
       {/* toast */}
       <div
         role="status"
-        className={`fixed left-1/2 top-[18px] z-[100] -translate-x-1/2 rounded-full bg-[#12306a] px-5 py-3 text-[0.86rem] font-semibold text-white shadow-[0_12px_30px_rgba(18,48,106,0.4)] transition-transform duration-400 ease-out ${toast ? "translate-y-0" : "-translate-y-20"}`}
+        className={`fixed left-1/2 top-[18px] z-[100] w-max max-w-[92vw] -translate-x-1/2 rounded-full bg-[#12306a] px-5 py-3 text-center text-[0.86rem] font-semibold text-white shadow-[0_12px_30px_rgba(18,48,106,0.4)] transition-transform duration-400 ease-out ${toast ? "translate-y-0" : "-translate-y-24"}`}
       >
         {toast}
       </div>
