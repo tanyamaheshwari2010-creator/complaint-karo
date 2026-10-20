@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, clearToken } from "../api/client.js";
+import { clearDraft, peekDraft } from "../api/draft.js";
 import { clearUser, getUser } from "../api/session.js";
 import ComplaintComposer from "../components/dashboard/ComplaintComposer.jsx";
 import ComplaintList from "../components/dashboard/ComplaintList.jsx";
@@ -26,6 +27,9 @@ export default function Dashboard() {
   const [toast, setToast] = useState("");
   const toastTimer = useRef();
 
+  // Something the visitor wrote on the home page before signing up / logging in
+  const [initialDraft] = useState(() => peekDraft());
+
   const showToast = (msg) => {
     setToast(msg);
     clearTimeout(toastTimer.current);
@@ -35,6 +39,7 @@ export default function Dashboard() {
   const handleLogout = useCallback(() => {
     clearToken();
     clearUser();
+    clearDraft();
     navigate("/login");
   }, [navigate]);
 
@@ -62,6 +67,11 @@ export default function Dashboard() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (initialDraft) showToast("Welcome! We kept what you wrote. Check it, then press Submit complaint.");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Quietly re-read the list, so a complaint moving along (reviewed, assigned, started, resolved)
   // shows up without refreshing the page.
   useEffect(() => {
@@ -76,18 +86,39 @@ export default function Dashboard() {
     };
   }, [load]);
 
-  const handleSubmit = async ({ description, location, photo }) => {
-    // Photos aren't supported by the backend yet, so only text goes out.
-    const data = await api.createComplaint({ description, location });
+
+  const handleSubmit = async ({
+    description,
+    location,
+    photo,
+    latitude,
+    longitude,
+    locationAccuracy,
+  }) => {
+    // Photos aren't supported by the backend yet, so only text and location go out.
+    const data = await api.createComplaint({
+      description,
+      location,
+      latitude,
+      longitude,
+      locationAccuracy,
+    });
+
+    clearDraft();
     setFilter("all");
     await load(true);
-    const id = data?.complaint?._id ? shortId(data.complaint._id) : "";
+
+    const id = data?.complaint?._id
+      ? shortId(data.complaint._id)
+      : "";
+
     showToast(
       photo
         ? "Complaint submitted. Photos can't be uploaded yet, so it was sent without the photo."
         : `Complaint ${id} submitted ✓`
     );
   };
+
 
   // The five real statuses are grouped into the three the citizen sees.
   const counts = useMemo(
@@ -115,10 +146,10 @@ export default function Dashboard() {
   const subtitle = loading
     ? "Loading your complaints…"
     : counts.progress
-    ? `${counts.progress} of your complaints ${counts.progress === 1 ? "is" : "are"} being worked on right now.`
-    : counts.all
-    ? "We're on it. You'll see updates here as they happen."
-    : "File your first complaint on the right.";
+      ? `${counts.progress} of your complaints ${counts.progress === 1 ? "is" : "are"} being worked on right now.`
+      : counts.all
+        ? "We're on it. You'll see updates here as they happen."
+        : "File your first complaint on the right.";
 
   return (
     <div className="relative min-h-screen overflow-hidden px-[clamp(16px,4vw,56px)] pb-[190px] font-sans text-[#14305e]">
@@ -162,7 +193,7 @@ export default function Dashboard() {
           />
         </section>
 
-        <ComplaintComposer onSubmit={handleSubmit} />
+        <ComplaintComposer onSubmit={handleSubmit} initial={initialDraft} />
       </main>
 
       {/* toast */}

@@ -1,5 +1,8 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import useVoiceInput from "../../hooks/useVoiceInput.js";
+
+// The map library is big, so it is only downloaded when someone presses "Choose on map".
+const MapLocationPicker = lazy(() => import("./MapLocationPicker.jsx"));
 
 const chipBase =
   "inline-flex h-10 cursor-pointer items-center gap-[7px] rounded-full border-2 px-4 text-[0.8rem] font-semibold transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50";
@@ -10,18 +13,39 @@ const fieldFocus =
 const MAX_PHOTO_MB = 5;
 
 /**
- * onSubmit({ description, location, photo }) must return a promise.
+ * onSubmit({ description, location, photo, latitude, longitude, locationAccuracy }) must return a promise.
  * Throw an Error inside it to show a message under the button.
+ *
+ * Optional props (the dashboard uses the defaults, the home page changes a few):
+ *   initial         { description, location, photo, latitude, longitude, locationAccuracy } to start with (a saved draft)
+ *   submitLabel     text of the button
+ *   requireLocation false = the location may be left empty
+ *   className       classes for the outer box
+ *   children        extra content shown under the button
  */
-export default function ComplaintComposer({ onSubmit }) {
-  const [description, setDescription] = useState("");
-  const [location, setLocation] = useState("");
-  const [photo, setPhoto] = useState(null);
+export default function ComplaintComposer({
+  onSubmit,
+  initial = null,
+  submitLabel = "Submit complaint",
+  busyLabel = "Submitting…",
+  requireLocation = true,
+  className = "max-[920px]:order-first",
+  children = null,
+}) {
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [location, setLocation] = useState(initial?.location ?? "");
+  const [coordinates, setCoordinates] = useState(
+    initial?.latitude != null
+      ? { latitude: initial.latitude, longitude: initial.longitude, locationAccuracy: initial.locationAccuracy ?? null }
+      : null
+  );
+  const [photo, setPhoto] = useState(initial?.photo ?? null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [lang, setLang] = useState("en-IN");
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
+  const [showMapPicker, setShowMapPicker] = useState(false);
 
   const voice = useVoiceInput({ lang, onTranscript: setDescription });
 
@@ -44,20 +68,35 @@ export default function ComplaintComposer({ onSubmit }) {
   };
 
   const useMyLocation = () => {
-    if (!navigator.geolocation) return setErrors((x) => ({ ...x, loc: "Your browser can't share location. Please type it." }));
+    if (!navigator.geolocation) {
+      setErrors((x) => ({ ...x, loc: "Your browser can't share location. Please type it." }));
+      return;
+    }
+
     setErrors((x) => ({ ...x, loc: "" }));
     setLocating(true);
+
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
-        // Turning coordinates into a street name needs a geocoding service later.
+        setCoordinates({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          locationAccuracy: coords.accuracy,
+        });
         setLocation(`Current location (${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)})`);
         setLocating(false);
       },
-      () => {
-        setErrors((x) => ({ ...x, loc: "Couldn't get your location. Please type it instead." }));
+      (error) => {
+        const message =
+          error.code === 1
+            ? "Location permission denied. You can enter the location manually."
+            : error.code === 3
+              ? "Location request timed out. Please try again."
+              : "Couldn't get your location. Please enter it manually.";
+        setErrors((x) => ({ ...x, loc: message }));
         setLocating(false);
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
@@ -69,17 +108,25 @@ export default function ComplaintComposer({ onSubmit }) {
     const place = location.trim();
     const next = {
       desc: text.length < 10 ? "Please describe the problem in a few words." : "",
-      loc: place ? "" : "Please tell us where the problem is.",
+      loc: requireLocation && !place ? "Please tell us where the problem is." : "",
     };
     setErrors(next);
     if (next.desc || next.loc) return;
 
     setSubmitting(true);
     try {
-      await onSubmit({ description: text, location: place, photo });
+      await onSubmit({
+        description: text,
+        location: place,
+        photo,
+        latitude: coordinates?.latitude ?? null,
+        longitude: coordinates?.longitude ?? null,
+        locationAccuracy: coordinates?.locationAccuracy ?? null,
+      });
       setDescription("");
       setLocation("");
       setPhoto(null);
+      setCoordinates(null);
     } catch (err) {
       setErrors({ form: err.message || "Couldn't submit. Please try again." });
     } finally {
@@ -87,32 +134,33 @@ export default function ComplaintComposer({ onSubmit }) {
     }
   };
 
-  // the small helper line under the voice/photo buttons
-  const note = !voice.supported
-    ? { text: "Voice typing isn't supported in this browser. You can still type your complaint.", err: false }
-    : voice.error
+  // the small helper line under the voice/photo buttons (real problems come first, so they are never hidden)
+  const note = voice.error
     ? { text: voice.error, err: true }
-    : voice.listening
-    ? { text: "Speak now. You can edit the text before submitting.", err: false }
     : errors.photo
-    ? { text: errors.photo, err: true }
-    : { text: "Photo is optional.", err: false };
+      ? { text: errors.photo, err: true }
+      : !voice.supported
+        ? { text: "Voice typing isn't supported in this browser. You can still type your complaint.", err: false }
+        : voice.listening
+          ? { text: "Speak now. You can edit the text before submitting.", err: false }
+          : { text: "Photo is optional.", err: false };
 
   return (
     <aside
       aria-labelledby="composer-title"
-      className="rounded-[36px_36px_36px_12px] bg-white/90 px-6 pb-[22px] pt-6 shadow-[0_18px_44px_rgba(47,111,184,0.22)] max-[920px]:order-first"
+      className={`rounded-[36px_36px_36px_12px] bg-white/90 px-6 pb-[22px] pt-6 shadow-[0_18px_44px_rgba(47,111,184,0.22)] ${className}`}
     >
       <h2 id="composer-title" className="text-[1.25rem] font-bold">What's the problem?</h2>
       <p className="mb-3.5 mt-0.5 text-[0.8rem] text-[#5b7396]">Tell us what's happening. We'll try to solve it.</p>
 
       <form onSubmit={handleSubmit} noValidate>
+        {/* resizable up and down only, and capped, so a long text can't push the page around */}
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           aria-label="Describe your complaint"
           placeholder="Describe the problem… e.g. Garbage hasn't been collected on Main Market Road for 4 days."
-          className={`min-h-28 w-full resize-y rounded-[20px] border-2 border-[#cfe0f5] bg-white px-4 py-3.5 text-[0.88rem] font-medium leading-normal text-[#14305e] ${fieldFocus}`}
+          className={`max-h-72 min-h-28 w-full resize-y rounded-[20px] border-2 border-[#cfe0f5] bg-white px-4 py-3.5 text-[0.88rem] font-medium leading-normal text-[#14305e] ${fieldFocus}`}
         />
         <p className="ml-1 min-h-[1.1em] text-[0.72rem] text-[#c4284d]">{errors.desc}</p>
 
@@ -165,7 +213,11 @@ export default function ComplaintComposer({ onSubmit }) {
 
         {photo && (
           <div className="mt-2.5 flex items-center gap-2.5">
-            <img src={previewUrl} alt="Selected photo preview" className="h-16 w-16 rounded-[16px_16px_16px_5px] border-2 border-[#cfe0f5] object-cover" />
+            {previewUrl ? (
+              <img src={previewUrl} alt="Selected photo preview" className="h-16 w-16 rounded-[16px_16px_16px_5px] border-2 border-[#cfe0f5] object-cover" />
+            ) : (
+              <span className="h-16 w-16 rounded-[16px_16px_16px_5px] border-2 border-[#cfe0f5] bg-[#f4f9ff]" />
+            )}
             <span className="flex-1 truncate text-[0.76rem] text-[#5b7396]">{photo.name}</span>
             <button
               type="button"
@@ -178,34 +230,73 @@ export default function ComplaintComposer({ onSubmit }) {
           </div>
         )}
 
-        {/* required location */}
-        <div className="mt-3 flex gap-2 max-[480px]:flex-col">
+        {/* location: the box on its own row, the two ways to fill it just below */}
+        <div className="mt-3">
           <input
             type="text"
             value={location}
-            onChange={(e) => setLocation(e.target.value)}
+            onChange={(e) => {
+              setLocation(e.target.value);
+              setCoordinates(null); // typing by hand means the old pin no longer matches
+            }}
             aria-label="Location"
             placeholder={locating ? "Finding you…" : "Where is it? (area, street, landmark)"}
             className={`h-[46px] w-full rounded-full border-2 border-[#cfe0f5] bg-white px-[18px] text-[0.88rem] font-medium text-[#14305e] ${fieldFocus}`}
           />
-          <button type="button" onClick={useMyLocation} disabled={locating} className={`${chipIdle} !h-[46px] shrink-0 max-[480px]:!h-10 max-[480px]:self-start`}>
-            <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
-              <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8.9 3A9 9 0 0 0 13 3.1V1h-2v2.1A9 9 0 0 0 3.1 11H1v2h2.1A9 9 0 0 0 11 20.9V23h2v-2.1a9 9 0 0 0 7.9-7.9H23v-2h-2.1ZM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z" />
-            </svg>
-            Use my location
-          </button>
+
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" onClick={useMyLocation} disabled={locating} className={chipIdle}>
+              <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
+                <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8.9 3A9 9 0 0 0 13 3.1V1h-2v2.1A9 9 0 0 0 3.1 11H1v2h2.1A9 9 0 0 0 11 20.9V23h2v-2.1a9 9 0 0 0 7.9-7.9H23v-2h-2.1ZM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z" />
+              </svg>
+              {locating ? "Finding you…" : "Use my location"}
+            </button>
+            <button type="button" onClick={() => setShowMapPicker(true)} className={chipIdle}>
+              <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
+                <path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" />
+              </svg>
+              Choose on map
+            </button>
+          </div>
+
+          {coordinates && (
+            <p className="ml-1 mt-2 flex flex-wrap items-center gap-x-2 text-[0.72rem] font-semibold text-[#17693a]">
+              <span>✓ Exact spot saved</span>
+              <button type="button" onClick={() => setCoordinates(null)} className="cursor-pointer font-medium text-[#5b7396] underline">
+                remove
+              </button>
+            </p>
+          )}
         </div>
         <p className="ml-1 min-h-[1.1em] text-[0.72rem] text-[#c4284d]">{errors.loc}</p>
 
         <button
           type="submit"
           disabled={submitting}
-          className="mt-3 h-[50px] w-full cursor-pointer rounded-full bg-linear-to-br from-[#4b8bf0] to-[#2457c5] text-[0.98rem] font-semibold text-white shadow-[0_10px_24px_rgba(47,111,224,0.38)] transition hover:-translate-y-px hover:shadow-[0_14px_30px_rgba(47,111,224,0.5)] focus-visible:outline-3 focus-visible:outline-offset-[3px] focus-visible:outline-[#2f6fe0]/45 active:scale-[0.985] disabled:cursor-wait disabled:opacity-70"
+          className="mt-3 h-[50px] w-full cursor-pointer rounded-full bg-linear-to-br from-[#4b8bf0] to-[#2457c5] text-[0.98rem] font-semibold text-white shadow-[0_10px_24px_rgba(47,111,224,0.38)] transition hover:shadow-[0_14px_30px_rgba(47,111,224,0.5)] focus-visible:outline-3 focus-visible:outline-offset-[3px] focus-visible:outline-[#2f6fe0]/45 active:scale-[0.985] disabled:cursor-wait disabled:opacity-70"
         >
-          {submitting ? "Submitting…" : "Submit complaint"}
+          {submitting ? busyLabel : submitLabel}
         </button>
         {errors.form && <p role="alert" className="mt-2 text-center text-[0.78rem] text-[#c4284d]">{errors.form}</p>}
       </form>
+
+      {/* The map dialog sits OUTSIDE the <form>. A form inside a form is not allowed in HTML. */}
+      {showMapPicker && (
+        <Suspense fallback={null}>
+          <MapLocationPicker
+            initial={coordinates ? { ...coordinates, location } : null}
+            onCancel={() => setShowMapPicker(false)}
+            onConfirm={({ latitude, longitude, location: place, locationAccuracy }) => {
+              setLocation(place);
+              setCoordinates({ latitude, longitude, locationAccuracy });
+              setErrors((current) => ({ ...current, loc: "" }));
+              setShowMapPicker(false);
+            }}
+          />
+        </Suspense>
+      )}
+
+      {children}
     </aside>
   );
 }

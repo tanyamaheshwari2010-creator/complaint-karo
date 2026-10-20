@@ -1,0 +1,25 @@
+/* Extra styles for the home page only (imported by pages/HomePage.jsx). */
+
+/* THE FLICKER: five quick dips every 3 seconds, never more than two in any one second.
+   It only dims (it never goes fully dark) and it is a small area, so it stays comfortable to look at. */
+.glow,
+.bulb-on {
+  animation: flicker 3s linear infinite;
+}
+@keyframes flicker {
+  0%, 5.5%, 8.5%, 22.5%, 25.5%, 46%, 49%, 62.5%, 65.5%, 82.5%, 85.5%, 100% { opacity: 1; }
+  6.5%  { opacity: 0.22; }
+  24%   { opacity: 0.3; }
+  47.5% { opacity: 0.18; }
+  64%   { opacity: 0.35; }
+  84%   { opacity: 0.25; }
+}
+
+/* two extra flies for the overflowing bin (.fly, .f2, .f3, .stink, .ripple come from dashboard.css) */
+.fly.f4 { animation-duration: 2.2s; animation-delay: -0.6s; }
+.fly.f5 { animation-duration: 3.4s; animation-delay: -2.2s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .glow,
+  .bulb-on { animation: none; opacity: 0.7; }
+}

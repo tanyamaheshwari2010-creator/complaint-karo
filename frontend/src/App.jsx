@@ -6,6 +6,7 @@ import Signup from "./pages/Signup.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import OfficerDashboard from "./pages/OfficerDashboard.jsx";
 import WorkerDashboard from "./pages/WorkerDashboard.jsx";
+import HomePage from "./pages/HomePage.jsx";
 
 export default function App() {
   return (
@@ -43,7 +44,9 @@ export default function App() {
         }
       />
 
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="/" element={<HomePage />} />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
 
 
     </Routes>

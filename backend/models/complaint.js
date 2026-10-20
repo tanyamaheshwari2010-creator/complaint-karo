@@ -41,11 +41,11 @@ const complaintSchema = new mongoose.Schema(
         aiSuggestedCategory: {
             type: String,
             enum: [
-            "garbage",
-            "water",
-            "electricity",
-            "streetlight",
-            "other"
+                "garbage",
+                "water",
+                "electricity",
+                "streetlight",
+                "other"
             ],
             default: null
         },
@@ -82,6 +82,21 @@ const complaintSchema = new mongoose.Schema(
                 "resolved"
             ],
             default: "submitted"
+        },
+
+        latitude: {
+            type: Number,
+            default: null
+        },
+
+        longitude: {
+            type: Number,
+            default: null
+        },
+        
+        locationAccuracy: {
+            type: Number,
+            default: null
         },
 
         assignedOfficerId: {

@@ -44,9 +44,16 @@ const classifyComplaintInBackground = async (complaintId, description) => {
 
 
 
+
 const createComplaint = async (req, res) => {
     try {
-        const { description, location } = req.body;
+        const {
+            description,
+            location,
+            latitude,
+            longitude,
+            locationAccuracy
+        } = req.body;
 
         if (typeof description !== "string" || !description.trim()) {
             return res.status(400).json({
@@ -54,10 +61,64 @@ const createComplaint = async (req, res) => {
             });
         }
 
+        // Coordinates must be provided as a valid pair.
+        const hasLatitude = latitude !== undefined && latitude !== null;
+        const hasLongitude = longitude !== undefined && longitude !== null;
+
+        if (hasLatitude !== hasLongitude) {
+            return res.status(400).json({
+                message: "Latitude and longitude must be provided together"
+            });
+        }
+
+        let coordinates = {
+            latitude: null,
+            longitude: null,
+            locationAccuracy: null
+        };
+
+        if (hasLatitude && hasLongitude) {
+            const lat = Number(latitude);
+            const lng = Number(longitude);
+
+            if (
+                !Number.isFinite(lat) ||
+                !Number.isFinite(lng) ||
+                lat < -90 ||
+                lat > 90 ||
+                lng < -180 ||
+                lng > 180
+            ) {
+                return res.status(400).json({
+                    message: "Invalid latitude or longitude"
+                });
+            }
+
+            let accuracy = null;
+
+            if (locationAccuracy !== undefined && locationAccuracy !== null) {
+                accuracy = Number(locationAccuracy);
+
+                if (!Number.isFinite(accuracy) || accuracy < 0) {
+                    return res.status(400).json({
+                        message: "Invalid location accuracy"
+                    });
+                }
+            }
+
+            coordinates = {
+                latitude: lat,
+                longitude: lng,
+                locationAccuracy: accuracy
+            };
+        }
+
         const complaint = await Complaint.create({
             citizenId: req.user.userId,
             description: description.trim(),
-            location: location?.trim() ?? "",
+            location:
+                typeof location === "string" ? location.trim() : "",
+            ...coordinates,
             aiStatus: "pending"
         });
 
@@ -80,6 +141,7 @@ const createComplaint = async (req, res) => {
         });
     }
 };
+
 
 
 
