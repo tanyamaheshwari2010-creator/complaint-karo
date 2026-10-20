@@ -61,6 +61,10 @@ const createComplaint = async (req, res) => {
             });
         }
 
+        if (description.length > 2000) {
+    return res.status(400).json({ message: "Description is too long (max 2000 characters)" });
+}
+
         // Coordinates must be provided as a valid pair.
         const hasLatitude = latitude !== undefined && latitude !== null;
         const hasLongitude = longitude !== undefined && longitude !== null;
